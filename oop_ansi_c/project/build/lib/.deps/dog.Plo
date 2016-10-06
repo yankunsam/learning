@@ -1,0 +1,5 @@
+dog.lo: ../../lib/dog.c /usr/include/stdc-predef.h ../../include/animal.h
+
+/usr/include/stdc-predef.h:
+
+../../include/animal.h:

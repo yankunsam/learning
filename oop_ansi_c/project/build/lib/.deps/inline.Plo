@@ -1,0 +1,6 @@
+inline.lo: ../../lib/inline.c /usr/include/stdc-predef.h \
+ ../../include/inline.h
+
+/usr/include/stdc-predef.h:
+
+../../include/inline.h:
