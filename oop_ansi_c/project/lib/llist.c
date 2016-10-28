@@ -71,3 +71,8 @@ void llist_destroy(LLIST * list_head)
     free(list_head);
 
 }
+LLIST * llist_swap_two(LLIST * list_head)
+{
+
+
+}
