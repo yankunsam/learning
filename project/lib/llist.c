@@ -35,7 +35,7 @@ LLIST * llist_create(size_t len)
     return llist;
 
 
-    
+
 }
 int llist_insert(LLIST * llist_head,struct node_st * node)
 {
@@ -49,24 +49,24 @@ int llist_insert(LLIST * llist_head,struct node_st * node)
     return 0;
 
 
-    
+
 }
 void llist_destroy(LLIST * list_head)
 {
-    
+
     struct node_st *next;
     struct node_st *prev;
     prev = list_head->head.next;
     while(prev != &(list_head->head))
     {
-        
+
         next = prev->next;
-        
+
         memset(prev->data,0,list_head->size);
         memset(prev,0,sizeof(struct node_st));
 
         prev = next;
-        
+
     }
     free(list_head);
 
@@ -86,7 +86,7 @@ LLIST *llist_swap_two(LLIST *list_head)
 		next ->next = cur;
 		if(cur -> next != NULL)
 			cur = cur -> next;
-		else 
+		else
 			return cur;
 		if(cur -> next != NULL)
 			next = cur -> next;
@@ -94,7 +94,7 @@ LLIST *llist_swap_two(LLIST *list_head)
 			return cur ;
 	}
 #if 1
-	head_new.size = list_head -> size; 
+	head_new.size = list_head -> size;
 	if(cur == NULL)
 
 		head_new.head = *next;

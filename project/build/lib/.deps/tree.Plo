@@ -35,7 +35,7 @@ tree.lo: ../../lib/tree.c /usr/include/stdc-predef.h ../../include/tree.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl2.h ../../include/inline.h \
- ../../include/stack.h ../../include/llist.h
+ ../../include/stack.h ../../include/leetcode.h ../../include/llist.h
 
 /usr/include/stdc-predef.h:
 
@@ -138,5 +138,7 @@ tree.lo: ../../lib/tree.c /usr/include/stdc-predef.h ../../include/tree.h \
 ../../include/inline.h:
 
 ../../include/stack.h:
+
+../../include/leetcode.h:
 
 ../../include/llist.h:

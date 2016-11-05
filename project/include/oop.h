@@ -1,7 +1,7 @@
 /*************************************************************************
 	> File Name: oop.h
-	> Author: 
-	> Mail: 
+	> Author:
+	> Mail:
 	> Created Time: 2016年07月03日 星期日 20时04分17秒
  ************************************************************************/
 
@@ -21,7 +21,7 @@
 #include <inline.h>
 
 #include <stack.h>
-
+#include <leetcode.h>
 #include <llist.h>
 #if ! defined MANY || MANY < 1
 #define MANY 10

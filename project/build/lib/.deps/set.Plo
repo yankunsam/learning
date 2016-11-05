@@ -34,8 +34,8 @@ set.lo: ../../lib/set.c /usr/include/stdc-predef.h ../../include/set.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl2.h ../../include/inline.h \
- ../../include/stack.h ../../include/llist.h ../../include/tree.h \
- /usr/include/assert.h
+ ../../include/stack.h ../../include/leetcode.h ../../include/llist.h \
+ ../../include/tree.h /usr/include/assert.h
 
 /usr/include/stdc-predef.h:
 
@@ -136,6 +136,8 @@ set.lo: ../../lib/set.c /usr/include/stdc-predef.h ../../include/set.h \
 ../../include/inline.h:
 
 ../../include/stack.h:
+
+../../include/leetcode.h:
 
 ../../include/llist.h:
 
