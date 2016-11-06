@@ -94,7 +94,7 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_oop_OBJECTS = main.$(OBJEXT)
+am_oop_OBJECTS = lengthLongestPath.$(OBJEXT)
 oop_OBJECTS = $(am_oop_OBJECTS)
 oop_DEPENDENCIES = $(top_srcdir)/build/lib/libset.la
 AM_V_lt = $(am__v_lt_$(V))
@@ -276,7 +276,7 @@ target_alias =
 top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ../..
-oop_SOURCES = main.c
+oop_SOURCES = lengthLongestPath.c
 #include_HEADERS = $(top_srcdir)/include/set.h
 INCLUDES = -I$(top_srcdir)/include/ -g
 oop_LDADD = $(top_srcdir)/build/lib/libset.la
@@ -374,7 +374,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/main.Po
+include ./$(DEPDIR)/lengthLongestPath.Po
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

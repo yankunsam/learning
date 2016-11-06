@@ -94,7 +94,7 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libset_la_LIBADD =
 am_libset_la_OBJECTS = set.lo option.lo cat.lo dog.lo inline.lo \
-	stack.lo llist.lo tree.lo
+	stack.lo llist.lo tree.lo leet_Code.lo
 libset_la_OBJECTS = $(am_libset_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -279,7 +279,7 @@ top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ../..
 noinst_LTLIBRARIES = libset.la
-libset_la_SOURCES = set.c  option.c cat.c dog.c inline.c stack.c llist.c tree.c 
+libset_la_SOURCES = set.c  option.c cat.c dog.c inline.c stack.c llist.c tree.c leet_Code.c
 libset_la_LDFLAGS = -set -avoid-version -shared
 #INCLUDES = -I$(top_srcdir)/include/
 AM_CPPFLAGS = -I$(top_srcdir)/include/
@@ -341,6 +341,7 @@ distclean-compile:
 include ./$(DEPDIR)/cat.Plo
 include ./$(DEPDIR)/dog.Plo
 include ./$(DEPDIR)/inline.Plo
+include ./$(DEPDIR)/leet_Code.Plo
 include ./$(DEPDIR)/llist.Plo
 include ./$(DEPDIR)/option.Plo
 include ./$(DEPDIR)/set.Plo
