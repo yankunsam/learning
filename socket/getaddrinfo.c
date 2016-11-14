@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 int main(int argc,char *argv)
 {
-    const char *p ="not.baidu.com";
+    const char *p ="baidu.com";
     struct addrinfo add_host;
     struct addrinfo *add;
     int ret;
@@ -22,7 +22,7 @@ int main(int argc,char *argv)
        fprintf(stderr,"getaddrinfo:%s\n",gai_strerror(ret));
        exit(0);
     }
-    s = inet_ntoa(add->ai_addr->sin_addr);
+    s = inet_ntoa(((struct sockaddr_in *)(add->ai_addr))->sin_addr);
     printf("%s\n",s);
     printf("the end\n");
     exit(0);
