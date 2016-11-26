@@ -1,0 +1,29 @@
+ECS:
+CPU Virtualiztion: Binary Translation：软件扫描 效率低
+                   Para-Virtualization：修改Guest 源码  效率高 不支持Windows
+                   硬件辅助虚拟化:芯片解决
+Memory Virtualiztion:OS 要求内寻地址从0开始 要求内存地址是连续的 使用superTLB加速访问效率
+
+                      Direct page table
+                      Guest and Hypervisor共享页表
+                      地址空间分段
+                      vTLB:只能处理已经访问过的虚拟地址
+
+                      影子页表：
+                      Extend Page Table: Intel   效率很高
+I/O Virtualization:重新定义I/O结构 --->PV
+                     设备直通：VT-d：DMA remaping  Intel
+                     SRIOV技术：
+
+                     WhatIO:作者
+                     Spinlocks:损失
+
+Linux内核Hotfix技术：
+    预留Pre-Defined接口
+    允许插入内核Module
+    有权访问内核内存
+    函数级别的替换
+    
+    设备访问Xen 内存
+    安全漏洞的修复！
+
