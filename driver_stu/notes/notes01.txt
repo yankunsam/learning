@@ -1,0 +1,133 @@
+主题：	1. 嵌入式基础知识
+	2. linux内核介绍
+	3. 内核的编译和安装(x86, Redhat)
+	4. 第一个模块
+	5. 模块的相关工具
+	6. 模块的符号导出
+	7. 模块的参数
+
+作业：
+1.看linux/module.h。以后每天看课程中接触到的头文件
+重点看module结构体(模块的计数就在module结构体中)
+
+2.看__init宏
+
+3.看linux/list.h
+
+4.实验模块参数的bool型，测试可否使用0/1,y/n等；
+如果模块的参数为数组，则需要使用module_param_array宏来声明
+自己写个例子，测试该宏的使用
+
+
+
+1. 嵌入式基础知识
+=======================
+资料说明；
+嵌入式行业的当前发展情况，嵌入式系统构成等
+
+
+
+2.linux内核的说明
+=======================
+kernel目录下有两个内核，一个是从www.kernel.org下载的标准内核，一个是由google修改、三星移植的内核；
+解压缩内核后说明一下目录结构，并介绍内核的核心功能
+
+
+
+3.内核的编译安装(x86)
+=======================
+(1)内核的配置
+$>make menuconfig
+通过图形界面(依赖于ncurses库)，决定编译的内核都包含哪些部分。
+最终的配置结果，存储在.config文件中
+决定代码是否编译，如果编译，是编译到zImage中，还是编译为.ko模块
+
+(2)内核的编译
+$>make
+编译生成zImage内核和.ko模块
+
+下面的步骤3和4只适用于Redhat。
+
+(3)内核模块的安装
+$>make modules_install
+将生成的.ko安装到磁盘上的特定位置(就是拷贝)
+一般是/lib/modules/xxx/目录(xxx为编译的内核的版本)
+
+(4)内核的安装
+$>make install
+将生成的zImage安装到/boot目录下
+(zImage在x86上称为bzImage，位于arch/x86/boot/目录下)
+
+接下来可以重新启动系统，看看新编译的内核能否使用(要看运气)
+
+
+
+4.第一个模块
+=========================
+参考x86-drv/01mod/目录下的mod_test01.c和Makefile
+认真了解这两个文件中每部分的作用
+
+mod_test01.mod.c
+struct module __this_module; (模块计数)
+
+
+5. 模块的相关工具(5个)
+=========================
+(1)模块的手工加载
+$>insmod mod_test01.ko
+会调用模块的入口函数，如果是printk的信息，用$>dmesg查看
+
+(2)模块的手工卸载
+$>rmmod mod_test01
+
+(3)显示模块信息
+$>modinfo xxx.ko
+
+(4)列出内核中已经加载的模块
+$>lsmod
+
+(5)自动加载模块
+模块的自动加载工具。该工具可以自动将模块所依赖的模块也一起加载。
+modprobe只能加载/lib/modules/xxx下的模块。
+$>modprobe xxx		//加载
+$>modprobe -r xxx  	//卸载
+用modprobe安装模块时，不需要写.ko
+
+tip:
+$>dmesg
+显示printk的信息
+$>dmesg -c
+清除printk的缓冲区
+
+
+
+6.模块的符号导出
+==========================
+为了避免命名空间污染，内核规定，.ko模块中的所有符号默认都为局部。必须通过EXPORT_SYMBOL宏导出后，才具有全局属性;
+EXPORT_SYMBOL宏可用于全局函数和全局变量;
+
+写01mod/mod_test02.c和mod_test03.c
+生成模块mod_test02.ko和mod_test03.ko
+可以用insmod/rmmod或modprobe测试
+
+$>make install  //执行Makefile中的目标install
+$>modprobe mod_test03
+会把依赖的mod_test02也加载
+
+$>modprobe -r mod_test03
+用-r可以卸载模块
+
+
+
+7.模块的参数
+=========================
+用module_param宏来声明模块参数
+参考01mod/mod_test04.c
+
+模块参数对应的文件是/sys/module/mod_test03/parameters/name和value
+module_param宏的第3个参数，就用来确定这两个文件的permission
+
+
+
+
+

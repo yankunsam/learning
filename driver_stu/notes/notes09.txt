@@ -1,0 +1,181 @@
+主题:	1. 设备模型的介绍和架构
+	2. platform_device和platform_driver
+	3. 设备模型的例子
+	4. 内核和用户态的netlink通讯机制
+	5. 如何利用设备模型实现/dev下设备文件的自动创建
+	6. 设备模型的核心结构体
+	7. 实现看门狗设备的完整驱动
+
+作业:
+1. 找另外的硬件，比如ADC, timer,
+RTC等，再准备几个platform_device，
+名字都叫"shrek"
+2. 只要pdev的名字和pdrv一致，双方就可以匹配。
+3. 在probe函数中，创建一个proc文件，打印设备对应寄存器的内容
+
+
+
+1.设备模型(驱动模型)的介绍和架构
+=============================
+设备模型从2.5版内核引入，最早是为了解决电源管理，热插拔等方面的问题，后来扩展到内核的很多领域。
+
+(1)设备结构体
+设备模型的核心内容是在内存中创建和实际存在设备一一对应的结构体，结构体中记录设备的物理信息，并且通过结构体间的关系对应设备的硬件拓扑。设备结构体的生存周期和设备一致，如果将设备移除，则内核会释放对应的结构体。
+
+设备结构体根据设备的总线进行分类：
+比如usb总线的设备对应的结构体为usb_device，pci/pci-e总线的设备结构体为pci_dev
+
+对于嵌入式设备来说，绝大多数设备都是用地址/数据/控制线连接的。内核将该总线称为platform总线，挂在总线上的设备结构体为platform_device。由于platform总线非热插拔，因此platform_device需要内核的移植或驱动开发人员手工准备。
+
+(2)用户态的访问接口
+通过/sys目录下的文件，可以访问内核中设备模型相关的结构体。
+/sys目录下的文件，和/proc下文件的实现机制很类似，也类似于windows下的设备管理器。
+/sys下的目录和内核中实际存在的设备模型结构体对应，如果内核的结构体存在(比如插入一个U盘)，则/sys下会有对应的目录；如果结构体不存在了(U盘拔出)，则/sys下的对应目录消失；
+
+如果访问/sys下的文件，那么会调用内核中和该文件对应的函数，通过函数返回设备模型结构体的信息。
+
+
+
+2.platform_device和platform_driver
+===================================
+嵌入式的设备大多都是基于platform总线，因此，必须掌握对应的device和driver。
+
+(1)platform_device的准备
+------------------------
+定义在<linux/platform_device.h>
+和实际存在的硬件一一对应。由内核的移植人员或驱动开发人员手工创建。pdev中记录设备的硬件信息。
+
+由于课堂使用的linux-3.5_tiny4412内核是三星的人员移植的，因此，三星人员也要负责创建对应的platform_device
+
+三星准备的platform_device在：
+arch/arm/mach-exynos以及plat-samsung目录下所有dev-开头的文件，以及plat-samsung目录下的文件devs.c
+
+platform_device也可以由驱动人员自行准备;
+
+
+(2)platform_device的注册
+---------------------------
+pdev是每个实际存在的设备都会对应一个，但实际的开发板往往只用到有限的设备，比如为4个串口都准备pdev，但开发板只用其中一个。
+
+因此，在内核的启动时，要注册实际用到设备对应的platform_device。没有用到的设备，其pdev不注册。
+
+注册设备用：
+platform_device_register(...);
+注销设备用：
+platform_device_unregister(...);
+函数负责注册/注销要使用设备对应的pdev
+
+三星在移植内核时，将开发板用到设备的指针集中放在一个数组中，然后用platform_add_devices注册整个数组。
+
+在arch/arm/mach-exynos目录下存放的是tiny4412开发板的初始化文件mach-tiny4412.c。找到其中platform_device的指针数组
+该数组名为smdk4x12_devices。
+
+如果一个设备的pdev没有注册，那么即使该设备的驱动已经被编译到zImage中，驱动也不会真正运行。
+
+参考drivers/arm-drv/04plat/plat_dev01.c
+在该文件中，为看门狗准备并注册了platform_device
+
+
+(3)platform_driver的准备和注册
+---------------------------
+pdrv和pdev对应。是在现有的char/block/网络等驱动外面套的一层外衣。
+定义在<linux/platform_device.h>
+pdrv中包含若干函数指针，由驱动人员实现这些函数
+。最核心的是probe和remove。这两个函数，在驱动对应设备的注册和注销时调用。
+
+老式驱动将设备的初始化放到模块的入口中进行，而基于设备模型的驱动，在模块的入口中只注册platform_driver。设备的初始化，在pdrv->probe函数中完成。
+
+在模块的入口中，向内核注册platform_driver:
+platform_driver_register(...);
+在模块的出口中，从内核注销platform_driver:
+platform_driver_unregister(...);
+
+
+
+3.设备模型的例子
+=========================
+参考x86-drv/06model/目录
+目录中的plat_dev1.c和plat_dev2.c中，在模块的入口函数中，准备并注册了和pc上硬件对应的platform_device。
+由于硬件都采用pci/pci-e总线，因此设备的物理地址和中断号由BIOS在开机时制定。可以用：
+$>lspci -v
+来查看当前机器所有pci/pci-e设备的详细信息。
+
+目录中的plat_drv1.c和plat_drv2.c中，是为pc上硬件准备的platform_driver以及对应的char驱动。
+
+通过实验，了解pdev和pdrv之间的匹配过程。
+
+
+
+4.内核和用户态通过netlink进行通讯
+==================================
+参考06model/udev1.c
+测试时可以安装或卸载platform的驱动例子，udev1会显示内核广播的信息；还可以插拔U盘来测试
+
+
+
+5.设备文件的自动创建
+=========================
+在驱动中创建新的class，并注册新的device。利用设备模型的通讯机制，由用户态的udevd辅助创建/dev下的设备文件。
+
+参考06model/plat_drv2.c或开发板上的drivers/arm-drv/04plat/plat_drv02.c
+
+
+
+6.设备模型的核心结构体
+=============================
+设备模型的核心头文件是下面的几个：
+<linux/kobject.h>
+<linux/device.h>
+<linux/platform_device.h>/<usb.h>...
+其中定义了8个结构体，都是设备模型的核心结构体
+在设计这些结构体时，内核采用了面向对象的概念
+
+kobject <-- device <-- platform_device
+	<-- device_driver <-- platform_driver
+
+kset <-- bus_type(对应一种总线)
+     <-- class(对应设备的一种功能分类)
+
+其中kobject/kset定义在kobject.h中；
+bus_type,class,device,device_driver定义在device.h中
+
+
+
+7.实现看门狗的完整char驱动
+==========================
+实现开门狗或类似设备的完整char驱动，包括platform_device的准备和注册，以及用platform_driver封装狗的char驱动
+
+推荐用misc而不是cdev来注册file_operations
+
+tips:关于设备的时钟
+一个设备(无论片内还是片外)在工作之前，必须确保提供电源以及时钟。
+对于4412处理器，时钟由芯片外围的24MHZ晶振产生，经过芯片内的PLL锁相环倍频后，提供给A9以及芯片内部的各个外设使用。
+可以通过4412内部的寄存器设置决定是否向某个片内外设提供时钟，一旦关闭了设备的时钟，则设备无法工作，也不再耗电。
+对于up4412版本的linux来说，初始化时有相当多的时钟时处于关闭状态的，因此，必须在启动中使能时钟，否则无法访问设备。
+
+使能时钟的例子：
+#include <linux/clk.h>
+
+static struct clk *wdt_clk;
+
+//获得并使能时钟
+wdk_clk = clk_get(&pdev->dev, "watchdog");
+if (IS_ERR(wdt_clk)) {
+	printk("Cannot get clock for watchdog\n");
+	return PTR_ERR(wdt_clk);
+}
+clk_enable(wdt_clk);
+
+//在驱动模块卸载时，应重新关闭时钟并递减时钟计数
+clk_disable(wdt_clk);
+clk_put(wdt_clk);
+
+说明：
+内核定义了用于描述设备时钟的结构体clk，该结构体中记录了时钟的命名，时钟的频率以及enable函数的指针等。
+对于4412，三星在移植linux时已经准备好了对应的clk结构体。驱动只要能找到这些结构体就可以直接使用了
+三星准备好的clk结构体位于文件arch/arm/mach-exynos/clock-exynos4.h中，基本上每个设备都有对应的clk结构体。
+clk_get()函数用于找到对应的clk结构体。该函数的第二个参数为要查找clk的名字。
+clk_enable()函数用于时钟的使能
+
+完整的驱动参见05wdt/wdt*，用户态的测试例子在users/wdt01.c中
+

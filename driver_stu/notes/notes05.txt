@@ -1,0 +1,214 @@
+主题：	1. 如何在linux驱动中访问寄存器
+	2. 如何访问开发板上的led灯
+	3. 针对led灯写char驱动1
+	4. led驱动的第二种写法
+	5. 写pwm驱动
+
+作业：
+1.看LED灯、按键、pwm(buzzer)、ADC等设备的电路图，裸机程序
+
+
+1.如何在linux驱动中访问寄存器(SFR)
+==================================
+片内外设：
+(1)基于三总线访问
+(2)用寄存器控制
+(3)寄存器有物理地址，通过手册获得，不可更改
+
+片外外设：
+(1)很少通过三总线相连，一般是用UART,485,CAN,I2C,USB,SPI,MIPI,I2S,AC97等总线相连。主芯片(如4412)内部必须提供对应的控制器
+(2)片外外设基本都是智能设备(不但有硬件，还有软件)
+(3)有些片外外设通过寄存器控制，有些则通过命令控制
+(4)如果用寄存器控制，寄存器没有物理地址，只有偏移
+(5)要控制片外外设，需要首先了解对应的总线
+
+4412内部的控制器 <--> 外部的外设
+
+
+4412内部的外设基本都通过寄存器来访问，每个寄存器有自己的物理地址。
+由于linux使能了MMU，因此对于驱动来说，不能直接使用寄存器的物理地址，必须将其映射为虚拟地址才可以使用
+
+例子：
+#include <linux/ioport.h>
+#include <linux/io.h>
+
+//定义物理基地址以及寄存器的偏移
+//GPIO_SIZE为寄存器的范围，可以按照使用的寄存器的总大小进行计算，比如下面就用了两个寄存器，范围是0x8；
+但由于地址映射的最小单位是4K，因此小于4K的值都是可以的
+#define GPIO_BASE	0x11000000
+#define GPIO_SIZE	0x1000	//0x8
+#define GPM4CON		0x2E0
+#define GPM4DAT		0x2E4
+
+void *tmp; //kmalloc 3G~4G(64位平台不确定)
+void __user *buf; //user space  0~3G
+void __iomem *vir; //3G~4G ioremap 映射寄存器
+
+
+/* 将物理地址映射到虚拟地址
+ * 如果不成功，则无法访问寄存器 */
+static void __iomem *vir_base;
+vir_base = ioremap(GPIO_BASE, GPIO_SIZE);
+if (!vir_base) {
+	printk("Cannot ioremap\n");
+	return -EIO;
+}
+
+
+//访问寄存器，一般采用基地址加偏移的模式
+//内核根据寄存器的大小，提供了一系列函数
+/* 8位寄存器 */
+char value;
+value = readb(vir_base + offset);
+writeb(value, (vir_base+offset));
+
+/* 16位寄存器 */
+short value;
+value = readw(vir_base+offset);
+writew(value, (vir_base+offset));
+
+/* 32位寄存器 */
+int value;
+value = readl(vir_base+offset);
+writel(value, (vir_base+offset));
+
+/* 64位寄存器 */
+u64 value;
+value = readq(vir_base+offset);
+writeq(value, (vir_base+offset));
+
+
+//如果不再访问寄存器，应该取消映射
+iounmap(vir_base);
+
+
+
+2.如何访问开发板上的led灯
+==========================
+看4412的电路图(核心板的P13)，可以查到4个led灯连接到4412的GPM4_0~GPM4_3
+
+查4412手册，找到GPM4CON和GPM4DAT寄存器的地址
+
+要控制led灯，应该将4412的GPIO配置为输出；
+在dat寄存器中写0将灯点亮，写1将灯熄灭；
+
+
+
+3.写针对led灯的char驱动1
+==========================
+参考arm-drv/led_test01.c
+为驱动的框架，大家将该驱动补充完整，并在开发板上测试
+
+arm-drv/led_test02.c
+我写的完整的例子
+
+
+
+4.led驱动的第二种写法
+==========================
+led灯的char驱动还有第二种写法，这种写法在实践中用的也是比较多的，请大家认真比较这两种char驱动；
+参考arm-drv/led_test03.c
+
+注意！在使能本驱动前，在menuconfig时要取消友善写的gpio驱动：
+Device Drivers --> char drivers --> led driver
+可以参考友善的驱动：
+drivers/char/tiny4412_leds.c
+
+(1)gpio库的使用
+本例子中属于gpio库的API说明如下：
+应包含头文件：
+#include <linux/gpio.h> //所有处理器通用的
+#include <plat/gpio-cfg.h> //三星芯片共用的
+#include <mach/gpio.h> //针对4412的
+
+plat指向的目录是arch/arm/plat-samsung/include/plat/；
+mach指向的目录是arch/arm/mach-exynos/include/mach/；
+
+//从<mach/gpio.h>中获得GPIO的编号
+int gpio_num = EXYNOS4X12_GPM4(0);
+
+//申请gpio
+//申请的gpio名字出现在/sys/kernel/debug/gpio文件中
+ret = gpio_request(gpio_num, "myio");
+if (ret)
+	printk("Request failed...\n");
+
+
+//对io进行配置
+s3c_gpio_cfgpin(gpio_num, S3C_GPIO_OUTPUT);
+还可以配置为S3C_GPIO_INPUT和S3C_GPIO_SFN(x)
+上述宏定义在<plat/gpio-cfg.h>
+
+//设置gpio输出0或1
+gpio_set_value(gpio_num, 0|1);
+
+//获得gpio输出的值(0或1)
+int ret = gpio_get_value(gpio_num);
+
+//释放gpio
+gpio_free(gpio_num);
+
+(2)用miscdevice替代cdev
+如果将4个LED看成一个设备，那么推荐用miscdevice来代替cdev注册，用misc注册时，用户态可以自动创建设备文件：
+例子：
+#include <linux/miscdevice.h>
+
+static struct file_operations led_fops = {
+	...
+};
+
+static struct miscdevice up4412_led_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= "abc",
+	.fops	= &led_fops,
+};
+
+注册(返回0成功)：
+	ret = misc_register(&up4412_led_dev);
+注销：
+	misc_deregister(&up4412_led_dev);
+
+
+5. buzzer的驱动
+====================
+buzzer连接开发板的GPD0_0.
+参考底板电路图P8蜂鸣器部分
+参考drivers/arm-drv/02misc/buzz_test02.c
+用echo on|off 控制蜂鸣器是否鸣响
+
+
+6. pwm驱动
+=====================
+参考drivers/arm-drv/02misc/buzz_test03.c
+用户态测试在drivers/arm-drv/user_test/buzz01.c
+可以控制蜂鸣器的音调等
+
+编译前，需要修改文件arch/arm/mach-exynos/mach-tiny4412.c
+见1836行：
+#ifdef CONFIG_TINY4412_BUZZER
+	&s3c_device_timer[0],
+#endif
+将条件编译的语句去掉来使能定时器0，然后再重新编译内核。
+
+linux也提供了pwm的专用接口库，例子如下：
+#include <linux/pwm.h>
+
+struct pwm_device *dev;
+
+//申请pwm通道(根据4412手册，id从0到3)
+dev = pwm_request(pwd_id, "xxx");
+
+//释放pwm通道
+pwm_free(dev);
+
+//配置pwm的占空比和频率，时间以ns为单位
+pwm_config(dev, 一个周期中高电平的ns数，整个周期的ns数)
+
+//使能pwm
+pwm_enable(dev);
+
+//关闭pwm
+pwm_disable(dev);
+
+一个pwm的常用领域是控制LCD的背光以及步进电机等
+

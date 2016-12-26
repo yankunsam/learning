@@ -1,0 +1,85 @@
+主题：	1. 块设备驱动的架构
+	2. 块设备驱动的核心结构体
+	3. x86上的内存缓冲区块设备驱动例子
+
+
+1.块设备驱动的架构
+======================
+略
+
+
+
+2.块设备驱动的核心结构体
+======================
+(1)gendisk
+定义在<linux/genhd.h>
+和一个磁盘(不是分区)对应。块设备驱动为每个实际存在的磁盘分配并初始化一个gendisk，并注册到块子系统。
+gendisk类似于net_device，input_dev，fb_info。
+
+(2)hd_struct
+定义在<linux/genhd.h>
+对应一个分区。在gendisk中，包含了hd_struct的指针数组。hd_struct中记录分区的起始扇区号和扇区数量。分区必须是一组连续扇区。
+hd_struct中封装了device结构体。
+
+(3)block_device_operations
+定义在<linux/blkdev.h>
+块设备的操作函数集。在gendisk中包含其指针。
+当用户态通过mount/fdisk等操作访问/dev/sda等块设备文件时，会调用block_device_operations中的open/ioctl等函数。
+如果访问磁盘上的具体文件，则不会调用函数集中的函数。
+
+当用户态打开一个块设备文件时，也会经过：
+sys_xxx --> vfs_xxx --> file_operations
+在内核fs/目录下的block_dev.c中，记录了通用块设备的file_ops，即def_blk_fops，在该函数集中，一旦发现用户态调用fdisk等操作，就会调用驱动block_device_operations中对应的函数。
+
+
+(4)request_queue
+定义在<linux/blkdev.h>
+请求队列，每个gendisk都有自己的请求队列。当块
+子系统准备好一个request时，会将该request挂到对应磁盘的请求队列中。磁盘驱动在合适的时间处理该请求。
+
+(5)request
+定义在<linux/blkdev.h>
+对应一个IO请求。由块子系统生成，传递给块设备驱动进行处理。每个request对应磁盘上的一组连续扇区，由于块子系统可以对磁盘访问进行排序和合并，因此每个request中访问的扇区可能对应多个分散的文件。
+
+每个request要么读，要么写磁盘，块子系统不会在一个request中将读写混合。块驱动要提供处理request的函数，当请求队列中有了新的请求后，会调用驱动的request处理函数进行处理。
+
+
+
+3.x86上的块设备例子
+======================
+参考x86-drv/08block/blk_test03.c
+由于块设备驱动的接口变动较大，因此，不同版本内核的驱动设计有区别。
+blk_test01.c适用于2.6.18(redhat 5)
+blk_test02.c适用于2.6.28
+blk_test03.c适用于2.6.32(redhat 6)
+blk_test03.c也使用于基于3.5内核的android
+
+
+驱动中的几个核心函数：
+(1)blk_init_request
+分配并初始化和gendisk配套的请求队列。一般来说，每个gendisk都有自己的请求队列。
+函数的第一个参数是ram_request，是由驱动提供的用于处理request的函数
+
+(2)alloc_disk
+分配一个gendisk，驱动支持的每个磁盘都应该分配一个
+
+(3)add_disk
+向块子系统注册gendisk。注册成功后，块子系统负责则/dev下生成对应的设备文件。文件名由gendisk->disk_name决定。文件的主设备号为gendisk->major
+
+
+如果能够编译通过：
+测试
+(1)make
+(2)insmod blk_test03.ko
+(3)如果安装成功，在/dev/下会出现/dev/shrek块设备文件
+(4)磁盘文件在使用前需要先格式化
+ $>mkfs.ext3 /dev/shrek
+(5)格式化后磁盘支持mount
+ $>mount /dev/shrek /mnt
+(6)向/mnt下拷贝文件
+ $>cp /home/* /mnt
+(7)卸载
+ $>umount /mnt /* umount /dev/shrekc */
+
+可以用dmesg查看驱动打印的信息
+

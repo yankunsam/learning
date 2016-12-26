@@ -1,0 +1,151 @@
+主题：	1.DM9000网卡的platform_device
+	2.DM9000硬件说明(MAC/MII/PHY)
+	3.网络驱动的架构和核心结构体
+	4.DM9000的platform_driver
+	5.net_device_ops->ndo_open/ndo_stop
+	6.net_device_ops->ndo_start_xmit
+	7.网卡的中断处理
+	8.网卡的测试
+
+说明：
+由于4412开发板已经把DM9000网卡换成了USB接口的DM9621网卡，虽然网络部分基本一致，但网卡的连接方式从三总线换为USB，从而导致驱动的设计难度大大增加。
+由于没有相应的硬件，本部分笔记仅供同学们学习网络驱动时的参考。
+关于网络驱动，大家还可以参考ldd3上的相关章节。
+
+
+作业：
+1.看alloc_etherdev和ether_setup函数
+2.看DM9000手册的P13~P27
+3.别忘了看6410 Display Controller手册
+4.尝试将3.4.4的网卡驱动移植到2.6.28内核	
+5.尝试加入ethtool_ops
+
+
+
+1.DM9000的platform_device
+===========================
+pdev记录网卡的硬件信息。包括物理地址，中断号等。需要通过电路图获得。
+
+通过电路图可以知道，网卡连接到6410的BANK1，通过addr2选择index和data端口；网卡的中断连接到6410的EINT7(用宏S3C_EINT(7)获得中断号)
+
+由于网卡驱动在2.6.28以后有较大的变化，因此使用3.4.4内核进行分析。
+
+参考linux-3.4.4_shrek6410/drivers/arm-drv/01net/dm9000_dev.c
+
+
+
+2.DM9000硬件
+==========================
+略
+MII: Media Independent Interface(媒体无关接口/媒体无关访问层)
+MII指的是MAC和PHY之间的一组引脚。如果要访问PHY中的寄存器，则需要了解MII，否则可以不需要知道MII的情况。
+
+重点关注一下MII接口和PHY。可参考datasheet/net目录下的IP101A的手册(独立PHY);93C46.pdf是一个EEPROM的手册
+
+
+
+3.网络驱动架构
+=========================
+用户态的eth0/eth1等
+	-->sys_socket/sys_bind等
+	  -->网络子系统(协议封装)
+	    -->网卡驱动(收发封装好的数据包)
+		-->网卡硬件
+
+核心结构体：
+(1)sk_buff
+定义在<linux/skbuff.h>
+用于封装一个完整的网络数据包。类似于input驱动中的input_dev。用于网络子系统和网卡驱动之间传输数据。
+
+(2)net_device
+定义在<linux/netdevice.h>
+由网络子系统定义，由驱动分配并初始化，最后注册到网络子系统。
+net_device对应一个实际存在的网卡硬件(也可能是一个虚拟的硬件，比如loopback设备)，如果一个驱动支持多个网卡，要实现并注册多个net_device。
+
+类似于input驱动中的input_dev，可以查看/sys/class/net目录，每个子目录对应一个注册过的net_device
+有些时候用$ifconfig可能无法显示所有存在的网络设备，这时候可以通过/sys/class/net确定到底有多少个设备
+
+net_device中的dev_addr成员要记录网卡的MAC地址，MAC地址还要写入DM9000的寄存器中。
+
+注意！net_device不是只为以太网卡准备，各类型的网络设备，比如wifi，bluetooth等，对应的网络驱动都要生成net_device
+
+
+(3)net_device_ops
+定义在<linux/netdevice.h>
+对应一套操作函数集，类似于char驱动实现的file_operations。这些函数由网卡驱动实现，将net_device_ops记录在net_device中，注册到网络子系统。
+
+当用户态对eth0等网卡设备进行访问时，会调用驱动net_device_ops中的函数。比如用ifconfig配置IP；用ifdown关闭网卡；用send发送数据等，都会调用net_device_ops中的函数
+
+核心函数：
+ndo_open
+当用户态用ifconfig配置网卡IP地址，或ifup启动网卡时调用(由DHCP服务器来分配IP地址)。如果一个网卡没有配IP，则不能工作。
+网卡硬件的初始化是在ndo_open中进行的。
+
+ndo_stop
+当用户态用ifdown关闭网卡时调用。ndo_stop中要关闭网卡硬件，并free_irq。
+
+ndo_start_xmit
+当用户态通过send发送数据包时调用。网络子系统将封装好的数据包记录在sk_buff中，然后调用驱动的ndo_start_xmit函数发送。
+
+接收数据在网卡的中断处理函数中进行。
+
+
+(4)ethtool_ops
+也是网卡驱动应该实现的一组函数。可选。如果希望支持用户态的ethtool工具，则驱动必须提供ethtool_ops。DM9000的例子程序中取消了对ethtool的支持。可以参考原始的DM9000驱动。
+
+
+
+4. platform_driver
+==========================
+(1)probe
+分配并初始化dm9k_priv和net_device
+注册net_device
+
+DM9000寄存器的初始化和request_irq，都延迟到用户态通过ifconfig启动网卡时进行(在net_device_ops->ndo_open中进行)
+
+(2)remove
+和probe对应，注销net_device，关闭网卡等
+
+(3)suspend/resume
+在2.6.28内核中，suspend/resume直接是platform_driver中的指针；而到了3.4.4内核，内核定义了专门用于电源管理的函数集dev_pm_ops，suspend/resume将集中在该函数集中，记录到platform_driver->driver->pm
+
+
+
+5.ndo_open和ndo_stop
+========================
+DM9000寄存器的初始化和中断处理函数的注册都在ndo_open中进行。所以，只用调用了open后，网卡才真正开始工作。
+
+open中重点看dm9000_init_regs
+在open函数的最后，启动net_device中的发送队列，允许网络子系统将sk_buff挂入该队列中。
+
+stop的内容和open正相反，包括停止发送队列，注销中断处理函数等，最后将网卡电源关闭。
+
+
+
+6.ndo_start_xmit
+==========================
+用于发送一个数据包。由驱动实现。
+函数将sk_buff中的完整数据包拷贝到DM9000的TXFIFO中。如果该包为TXFIFO中的第一个数据包，则马上启动发送；
+如果是TXFIFO中的第二个数据包(DM9000应该正在发送第一个包)，那么当前包发送延迟到中断处理中完成(对应第一个包发完)
+
+根据sk_buff->ip_summed成员，决定是否由DM9000负责对要发送的数据包进行补码校验
+
+
+
+7.网卡的中断处理函数
+========================
+根据网卡中断掩码寄存器的设定，DM9000在收到一个数据包；一个数据包发送完成；网线插拔等情况下生成中断，并调用中断处理函数。
+
+网卡的中断处理函数为dm9000_interrupt。驱动中实现了3个子函数，分别处理接收、发送完成、网线插拔等情况
+
+
+
+8.测试
+=======================
+编译3.4.4内核测试
+要修改文件系统的配置文件：
+改/nfsboot/qt_root/etc/init.d/rcS
+将/etc/init.d/ifconfig-eth0注释掉
+
+
+

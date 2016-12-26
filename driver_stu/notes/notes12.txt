@@ -1,0 +1,60 @@
+主题： 	1.USB总线的基本知识
+	2.USB设备
+	3.linux中的usb头文件和代码
+	4.usb的核心结构体和编程
+	5.实验例子
+
+
+1.USB总线基本知识
+===========================
+参考08usb/01readme.h
+该文件中记录了usb协议的基本知识，以及linux对usb的支持。
+可以参考usb2.0的协议，以及ldd3书的usb驱动一章
+
+
+2.USB设备
+===========================
+类似于usb鼠标，usb网卡等。参考08usb/datasheet/下的dm9601.pdf/dm9621.pdf手册
+
+每个usb设备都从如下角度描述：
+device(设备)
+configuration(配置)
+interface(接口)
+endpoint(端点)
+
+当一个usb设备连接到usb host时，主机会向设备发命令，从设备读出若干个描述符(descriptor)，这些描述符中会记录上面device等信息。
+
+
+
+3. linux中的usb相关头文件和代码
+=============================
+usb子系统的核心头文件是include/linux/usb.h。其中包含了usb驱动需要的各种结构体。
+另外，为了描述usb设备，还有一些结构体位于include/linux/usb/ch9.h
+
+当一个usb设备插入主机后，usb子系统的相关代码运行，根据从设备中读入的描述符信息，自动分配并初始化usb_device/usb_interface等结构体。
+
+再接下来，内核将注册usb_interface，内核负责将该结构体和usb_driver进行匹配(usb_driver由驱动人员实现)，一旦匹配通过，则调用usb_driver->probe。过程和platform_device/platform_driver类似。
+
+内核源代码的drivers/usb目录包括usb子系统，usb主机驱动，以及部分usb_driver的代码。
+
+还有一些usb_driver，是分散在drivers/下的其他目录中，比如usb网卡的驱动就在drivers/net目录下；usb鼠标驱动在drivers/hid/目录下。
+
+
+4. usb的核心结构体和编程
+=============================
+核心结构体参考08usb/02usb-struct.h
+和中断端点的通讯参考08usb/03usb-int.h
+
+
+5. usb驱动的例子
+=============================
+(1)07usb/src/usb_test01.c
+该例子针对dm9601/dm9621设备，采用同步方式从设备的控制端点(端点0)读取一个或多个寄存器; 或写一个寄存器
+
+(2)07usb/src/usb01.c
+用户态的测试程序
+
+(3)07usb/src/usbmouse.c
+usb鼠标的驱动，只支持最基本的鼠标协议，需要先卸载内核中的usbhid驱动才能运行。
+
+

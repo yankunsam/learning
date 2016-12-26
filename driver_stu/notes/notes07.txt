@@ -1,0 +1,206 @@
+主题：	1. 中断源和中断号
+	2. linux的中断处理过程
+	3. 如何写和注册中断处理函数
+	4. 基于开发板上的按键实现中断的例子
+	5. 中断的下半部及例子
+
+系统调用号(0~300)
+GPIO号(0～300多)
+设备号(32位）
+IOCTL号（32位)
+中断号(0~NR_IRQS)
+
+进程号，文件描述符。。。
+task_struct , file 
+
+
+1.中断源和中断号
+======================
+中断是硬件通过硬件电路产生的，因此，如果一个外设没有独立的中断线，也就不能产生中断;
+问题：usb鼠标能产生中断么？
+
+中断控制器的工作是收集硬件产生的中断，然后根据预先设定好的优先级依次提交给cpu。
+对arm处理器来说，中断控制器的发展经历了3个阶段：
+PIC (Programmable Interrupt Controller)
+VIC (Vector Interrupt Controller)
+GIC (General Interrupt Controller)
+4412采用了其中最先进的GIC(用于多核处理器)
+
+中断源: 是硬件概念，可参考4412的GIC控制器
+中断号: 是软件概念，从0开始依次向后排。在linux内核中使用，和中断源有一定的对应关系
+
+每种不同处理器的中断源都不一样，从中断源到中断号的转换方式也不一样.
+对于4412处理器来说，搞清中断源和中断号的对应关系是一个很复杂的工作，具体可参考arch/arm/mach-exynos/include/mach/irqs.h头文件
+
+在注册中断处理函数时，可以用如下方式包含该头文件，并引用其中的宏：
+#include <mach/irqs.h>
+
+如果要计算4412外接设备的中断号(比如连接GPIO的按键产生中断)，可以用GPIO号进行转化:
+int irq_num = gpio_to_irq(gpio号);
+//gpio号可参考led灯的第二个例子，如按键0连接到4412的IO为GPX3_2，则对应的gpio号为EXYNOS4_GPX3(2)
+
+如果要找4412内部设备的中断号，只能看文件<mach/irqs.h>
+
+
+
+2.linux的中断处理
+======================
+(1)处理过程
+略
+
+(2)核心结构体
+1. irq_desc
+定义在<linux/irq.h>
+对应一个中断号。linux内核在启动时分配了一个irq_desc的数组，数组中共有NR_IRQS个成员。每个irq_desc中记录对应中断的各类信息，比如中断的处理函数，中断的发生次数等。
+irq_desc由内核负责准备。
+
+2. irqaction
+定义在<linux/interrupt.h>
+每个irqaction用于封装一个中断处理函数。结构体由驱动人员负责分配。
+irqaction中包含中断号；中断处理函数指针；中断的执行标志；中断名等
+
+3. irq_handler_t
+定义在<linux/interrupt.h>，如下：
+irqreturn_t (*irq_handler_t)(int, void *);
+中断处理函数。由驱动负责实现，记录在irqaction中。
+irqreturn_t只有两个值，IRQ_NONE/IRQ_HANDLED。如果中断不是由本设备引起的，则返回IRQ_NONE，否则返回IRQ_HANDLED。
+函数参数irq为中断号，void *为传递给中断处理函数的参数，对应irqaction->dev_id。
+
+
+
+3.如何写和注册中断处理函数
+=============================
+驱动人员在设计中断处理函数时，要遵循的要求是：
+(1)可嵌套不可重入
+(2)不能睡眠
+(3)如果硬件有中断的状态寄存器，软件要负责清除中断的标志位。一般来说，如果不清除标志位，设备无法再次产生中断
+
+(4)中断处理函数的注册和注销
+例子：
+#include <linux/interrupt.h>
+#include <mach/irqs.h> //片内外设
+#include <linux/gpio.h> //片外外设
+#include <mach/gpio.h>
+
+//确定中断号
+#define KEY_IRQ		gpio_to_irq(gpio号);
+
+//中断处理函数
+static irqreturn_t
+key_service(int irq, void *dev_id)
+{
+	//根据硬件要求完成相应工作
+	...
+	return IRQ_HANDLED 或 IRQ_NONE;
+}
+
+//注册中断处理函数，必须检查返回值
+//request_irq内部会分配并初始化irqaction
+//如果是4412的内部设备产生的中断，一般不需要共享，也不用配置IO，则flags可以为0
+
+u32 flags = IRQF_TRIGGER_FALLING 
+	| IRQF_TRIGGER_RISING 
+	| IRQF_SHARED;
+
+int ret;
+ret = request_irq(KEY_IRQ, /* 中断号 */
+	key_service, /* 中断处理函数 */
+	flags, /* 中断的标志 */
+	"xxx", /* 中断处理函数的名字 */
+	dev_id);
+/* 最后的参数dev_id为传给中断处理函数的参数，一般会设置为私有结构体的指针，不能为NULL */
+实际上，如果是非共享的中断，dev_id可以为NULL
+
+if (ret) {
+	printk("Cannot register interrupt handler\n");
+	return -1;
+}
+
+//注销中断处理函数
+free_irq(irq, dev_id);
+参数为中断号和dev_id。dev_id一定要和request_irq中的最后一个参数一致。
+
+在pc上打开文件/proc/interrupts，找一个合适的中断号
+写例子drv-x86/05irq/irq_test.c
+
+可以人为关闭(mask)/打开某个中断:
+disable_irq(int irq);
+enable_irq(int irq);
+
+
+4. 按键的例子
+=====================
+在4412开发板上写一个用按键产生中断，控制led灯的例子
+注意！由于4412的内核中已经有按键的驱动，因此，如果希望上面的驱动能运行，需要通过menuconfig取消内核中的按键驱动。
+该驱动位于：
+Device Driver --> Input device driver --> Miscellaneous device ...
+将其中GPIO驱动和user level驱动去掉
+
+参考底板电路图P8，4个按键连接EINT26～29
+主板电路图的P3，对应GPX3_2到GPX3_5
+可以看<mach/gpio.h>找到GPX3_2对应的gpio号，然后用gpio_to_irq获得对应的中断号
+
+
+
+5. 中断下半部
+=====================
+(1)下半部的含义
+---------------------
+在进入中断处理函数前，会默认关闭本中断。对于某些要求迅速响应或数据吞吐量很大的中断，要考虑将中断处理函数的工作分为两个部分，分别称为中断的上半部和下半部。
+
+下半部的实现有多种方法，包括softirq,tasklet和工作队列(work queue).
+对于驱动来说，只会使用tasklet和工作队列(work queue)
+
+可以打开或关闭本cpu的下半部：
+local_bh_enable();
+local_bh_disable();
+
+
+(2)tasklet
+----------------------
+tasklet特点
+(1)在上半部执行完后马上执行，但此时中断是全部打开的;
+(2)执行tasklet时内核仍处于中断上下文，因此不能睡眠;
+(3)tasklet的执行函数不会重入;
+(4)如果在tasklet的执行期间再次发生调度，第二次调度无效;
+
+例子：
+#include <linux/interrupt.h>
+
+//声明tasklet结构体
+struct tasklet_struct mytask;
+
+//tasklet的执行函数
+void bo_service(unsigned long data)
+{
+	...
+}
+
+//上半部的执行函数
+irqreturn_t up_service(int irq, void *dev_id)
+{
+	//触发tasklet下半部
+	tasklet_schedule(&mytask);
+	或tasklet_hi_schedule(&mytask);
+	...
+}
+
+//初始化tasklet
+tasklet_init(&mytask, bo_service, (unsigned long)dev);
+
+参考05irq/tasklet_test.c
+
+
+(3)工作队列(work queue)
+工作队列特点
+(1)推后到进程上下文执行，此时中断是全部打开的;
+(2)执行work时处于进程上下文，因此可以睡眠;
+(3)work的执行函数不会重入;
+(4)如果在work的执行期间再次发生调度，第二次调度无效;
+
+工作队列的实现在<linux/workqueue.h>
+
+参考05irq/下的例子wq_test01.c, wq_test02.c
+
+
+
