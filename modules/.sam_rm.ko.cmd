@@ -1,0 +1,1 @@
+cmd_/home/sam/fork/learning/modules/sam_rm.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/sam/fork/learning/modules/sam_rm.ko /home/sam/fork/learning/modules/sam_rm.o /home/sam/fork/learning/modules/sam_rm.mod.o
