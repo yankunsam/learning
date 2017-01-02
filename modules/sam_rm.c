@@ -5,6 +5,9 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 struct proc_dir_entry *proc_entry;
+struct proc_data{
+	int i;
+};
 
 #if 1
 ssize_t proc_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
@@ -16,15 +19,26 @@ ssize_t proc_read(struct file *file, char __user *buf, size_t size, loff_t *ppos
 	return 1;
 }
 #endif
+static int proc_show(struct seq_file *seq, void *offset)
+{
+	seq_printf(seq,"hello\n");
+	return 0;
+}
+int proc_open(struct inode *inode, struct file *file)
+{
+	struct proc_data meta;
+	meta.i = 1;
+	single_open(file,proc_show,NULL);
+	return 0;
+}
 static struct file_operations proc_fops = {
-	.read = proc_read,
-	//.read = seq_read,
+	.read = seq_read,
+	.open = proc_open,
 };
 static int __init hello_init(void)
 {
 	printk("hello,I am coming\n");
 	proc_entry = proc_create("sam_rm",0,NULL,&proc_fops);
-	//proc_entry->proc_fops = &proc_fops;
 	return 0;
 
 }
