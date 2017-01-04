@@ -1,5 +1,5 @@
-modules_cur := sam_rm.ko
-obj-m := sam_rm.o
+modules_cur := char_driver.ko
+obj-m := char_driver.o
 KERNEL :=/home/sam/fork/linux/
 all:
 	make -C $(KERNEL) M=`pwd` $(modules_cur)
