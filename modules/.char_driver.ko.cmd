@@ -1,0 +1,1 @@
+cmd_/home/sam/fork/learning/modules/char_driver.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/sam/fork/learning/modules/char_driver.ko /home/sam/fork/learning/modules/char_driver.o /home/sam/fork/learning/modules/char_driver.mod.o
