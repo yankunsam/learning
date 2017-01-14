@@ -2,13 +2,29 @@
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
+#include <linux/kernel.h>
 struct ima
 {
     int i;
     struct cdev *cdev;
 };
+int ima_open(struct inode *inode,struct file *filp)
+{	
+	struct ima *temp;
+	temp = container_of(inode->i_cdev,struct ima,cdev);
+	filp->private_data = temp;
+	if( (filp->f_flags & O_ACCMODE) == O_WRONLY)
+	{
+		printk("Opened");
+	}
+	return 0;
+}
+
 struct ima my_ima;
-struct file_operations my_file_operations;
+struct file_operations my_file_operations = {
+	.owner = THIS_MODULE,
+	.open = ima_open,
+};
 static int __init my_init(void)
 {
     struct cdev *my_cdev = cdev_alloc();
