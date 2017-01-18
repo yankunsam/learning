@@ -1,7 +1,7 @@
 #!/usr/bin/python
 class Employee:
     'Common base class for all employee'
-    __empCount = 0
+    empCount = 0
     #bahavior
     def __init__(self,name,salary):
         self.name = name

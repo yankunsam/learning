@@ -14,7 +14,7 @@ class Employee:
 
 emp1 = Employee("god",1)
 emp2 = Employee("wade",10000000000)
-'''
+
 emp3 = Employee("kobe",3);
 setattr(emp3,'age',41)
 print "emp3 age:",getattr(emp3,'age')
@@ -22,9 +22,7 @@ print "emp2 age:" ,hasattr(emp2,'age')
 print "emp3 age:",hasattr(emp3,'age')
 delattr(emp3, 'age')
 print "emp3 age:",hasattr(emp3,'age')
-'''
+
 emp1.displayEmployee()
 emp2.displayEmployee()
-'''
 print "Employee.__doc__",Employee.__doc__
-

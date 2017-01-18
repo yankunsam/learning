@@ -25,6 +25,7 @@ static const  struct file_operations proc_fops = {
 static int __init hello_init(void)
 {
 	printk("hello,I am coming\n");
+    pr_info("hello\n");
 	proc_entry = proc_create("sam_rm",0,NULL,&proc_fops);
 	return 0;
 

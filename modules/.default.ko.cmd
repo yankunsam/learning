@@ -1,0 +1,1 @@
+cmd_/home/sam/work/learning/modules/default.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/sam/work/learning/modules/default.ko /home/sam/work/learning/modules/default.o /home/sam/work/learning/modules/default.mod.o
