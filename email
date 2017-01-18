@@ -6,7 +6,7 @@ version=
 	shift
 }
 
-repo="ltp-ddt"
+repo="learning"
 
 files=$(git format-patch -M --subject-prefix="PATCH$version $repo" "${@:--1}")
 
