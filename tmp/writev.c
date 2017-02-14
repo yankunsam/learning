@@ -22,6 +22,8 @@ int main(int argc,char * argv[])
 		perror("writev()");
 		exit(EXIT_FAILURE);
 	}
+	printf("sizeof:%d\n",sizeof("abc"));
+	printf("strlen:%d\n",strlen("abc"));
 	exit(0);
 
 }

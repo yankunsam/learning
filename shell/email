@@ -1,0 +1,3 @@
+#!/bin/bash
+[ ! -e ~/tmp  ] && mkdir ~/tmp/
+cp -r /tmp/*.patch ~/tmp/
