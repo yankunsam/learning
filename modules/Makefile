@@ -1,6 +1,6 @@
-modules_cur := default.ko
-obj-m := default.o
-KERNEL :=/home/sam/fork/linux/
+modules_cur := ima_evm.ko
+obj-m := ima_evm.o
+KERNEL := /home/sam/8lab_work/linux
 all:
 	make -C $(KERNEL) M=`pwd` $(modules_cur)
 install:
