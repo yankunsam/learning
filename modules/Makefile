@@ -1,5 +1,6 @@
-modules_cur := ima_evm.ko
-obj-m := ima_evm.o
+name = init
+modules_cur := $(name).ko
+obj-m := $(name).o
 KERNEL := /home/sam/8lab_work/linux
 all:
 	make -C $(KERNEL) M=`pwd` $(modules_cur)
