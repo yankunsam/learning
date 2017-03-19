@@ -1,2 +1,2 @@
 #!/bin/bash
-update-initramfs -k 4.4.0+ima -u
+update-initramfs -k $(uname -r) -u
