@@ -7,7 +7,6 @@ su -c 'keyctl pipe `keyctl search @u user kmk-user` > /etc/keys/kmk-user.blob'
 su -c 'keyctl add user evm-key "new user:kmk-user 32" @u'
 #su -c 'keyctl pipe `keyctl search @u encrypted evm-key` >/etc/keys/evm-user.blob'
 su -c 'keyctl pipe `keyctl search @u user evm-key` >/etc/keys/evm-user.blob'
-su root
 openssl genrsa -out /etc/keys/privkey_evm.pem 1024
 openssl rsa -pubout -in /etc/keys/privkey_evm.pem -out /etc/keys/pubkey_evm.pem
 openssl genrsa -out /etc/keys/privkey_ima.pem 1024
