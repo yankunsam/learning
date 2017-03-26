@@ -1,0 +1,17 @@
+[ req ]
+default_bits = 1024
+distinguished_name = req_distinguished_name
+prompt = no
+string_mask = utf8only
+x509_extensions = myexts
+
+[ req_distinguished_name ]
+O = sm-machine
+CN = sam signing key
+emailAddress = sam@sm-machine
+
+[ myexts ]
+basicConstraints=critical,CA:FALSE
+keyUsage=digitalSignature
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid
