@@ -23,6 +23,7 @@ git send-email	-q \
 		--no-signed-off-by-cc \
 		--no-chain-reply-to \
 		--to="kunx.yan@intel.com" \
+		--to="yankun@aliyun.com" \
 		$files
 
 mv -f $files /tmp
