@@ -1,0 +1,22 @@
+|->notify_change()
+ |->ima_inode_post_setattr()
+  |->ima_must_appraise()
+**********************************
+|->SYSCALL_DEFINE4(mknodat...)
+ |->ima_post_path_mknod()
+  |->ima_must_appraise()
+**********************************
+|->ima_inode_setxattr()
+ |->ima_protect_xattr()
+**********************************
+|->do_sys_open()
+ |->do_filp_open()
+  |->path_openat()
+   |->do_last()
+    |->ima_file_check()
+     |->process_measurement()[multiple reference]
+      |->ima_appraise_measurement()
+       |->evm_verifyxattr()
+        |->evm_verify_hmac()
+         |->integrity_digsig_verify(INTEGRITY_KEYRING_EVM,...)
+       |->integrity_digsig_verify(INTEGRITY_KEYRING_IMA,...)
