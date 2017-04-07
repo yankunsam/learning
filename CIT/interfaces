@@ -1,0 +1,22 @@
+# interfaces(5) file used by ifup(8) and ifdown(8)
+auto lo
+iface lo inet loopback
+iface eth0 inet manual
+auto br0
+iface br0 inet dhcp
+#iface br0 inet static
+pre-up ip tuntap add dev tap0 mode tap user sam
+pre-up ip link set tap0 up
+#address 192.168.1.2
+#network 192.168.1.1
+#netmask 255.255.255.0
+#broadcast 192.168.1.255
+#gateway 192.168.1.1
+
+bridge_ports all tap0
+bridge_fd 0
+#bridge_hello 2
+bridge_stp off
+bridge_maxwait 0
+post-down ip link set tap0 down
+post-down ip tuntap del dev tap0 mode tap
