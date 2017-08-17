@@ -1,6 +1,8 @@
 #!/bin/bash
 echo "you should run the script in the current directory to have a good feeling"
 echo ""
+sudo apt-get update
+sudo apt-get install -y ima-evm-utils keyutils
 
 if [ $(whoami) != "root" ]; then
     echo "you should run this script as root!!!"
