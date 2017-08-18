@@ -36,11 +36,15 @@ cp ./evm  /etc/sysconfig/
 
 cp ./ima.sh /etc/initramfs-tools/hooks/
 chmod +x /etc/initramfs-tools/hooks/ima.sh
-chmod +x ./ima.sh
+cp ./ima_02.sh /etc/initramfs-tools/scripts/local-top/ima.sh
+chmod +x /etc/initramfs-tools/scripts/local-top/ima.sh
+
+
 update-initramfs -k $(uname -r) -u
 echo "Now,you have updated the current initramfs in "/boot/initrd.img-$(uname -r)""
 echo "It will label the entire file system,so you can have a tea :)"
 if [ $? -ne 0 ]; then
-    echo "some errors occured when labeling the entire file system,it maybe not reboot successfully in the next time"
+	echo "some errors occured when labeling the entire file system,it maybe not reboot successfully in the next time"
 else
-echo "you can reboot only with "ima_tcb ima_appraise_tcb" and enjoy the fun which IMA/EVM brings,yea,maybe bad dreams "
+    echo "you can reboot only with "ima_tcb ima_appraise_tcb" and enjoy the fun which IMA/EVM brings,yea,maybe bad dreams "
+fi
