@@ -1,0 +1,3 @@
+NELMODE="NO"
+MASTERKEYTYPE="user"
+MASTERKEY="/etc/keys/kmk-${MASTERKEYTYPE}.blob"

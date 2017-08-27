@@ -1,0 +1,44 @@
+ |->__init kernel_init_freeable()
+  |->integrity_load_keys()
+   |->evm_load_x509()
+*************************************************
+|->ima_appraise_measurement()
+ |->evm_verifyxattr()
+  |->evm_verify_hmac()
+   |->evm_find_protected_xattrs()
+*************************************************
+
+|->vfs_setxattr()
+ |->security_inode_setxattr()
+  |->evm_inode_setxattr()
+   |->evm_protect_xattr()
+    |->evm_verify_current_integrity() 
+     |->evm_verify_hmac()
+      |->evm_find_protected_xattrs()
+*************************************************
+|->notify_change()[multiple referenced]
+ |->security_inode_setattr()
+  |->evm_inode_setattr()
+   |->evm_verify_current_integrity() 
+    |->evm_verify_hmac()
+     |->evm_find_protected_xattrs()
+*************************************************
+
+|->vfs_removexattr()
+ |->security_inode_removexattr()
+  |->evm_inode_removexattr()
+*************************************************
+|->__vfs_setxattr_noperm()
+ |->security_inode_post_setxattr()
+  |->evm_inode_post_setxattr()
+   |->evm_reset_status()
+*************************************************
+|->vfs_removexattr()
+ |->evm_inode_post_removexattr()
+************************************************
+|->notify_change()
+ |->evm_inode_post_setattr()
+************************************************
+|->ext4_init_security()
+ |->security_inode_init_security()[multiple referenced]
+  |->evm_inode_init_security()

@@ -1,0 +1,23 @@
+X.509 certificate list changed
+  CHK     include/generated/compile.h
+###
+### Now generating an X.509 key pair to be used for signing modules.
+###
+### If this takes a long time, you might wish to run rngd in the
+### background to keep the supply of entropy topped up.  It
+### needs to be run as root, and uses a hardware random
+### number generator if one is available.
+###
+openssl req -new -nodes -utf8 -"sha512" -days 36500 \
+		-batch -x509 -config x509.genkey \
+		-outform DER -out signing_key.x509 \
+		-keyout signing_key.priv 2>&1
+Generating a 4096 bit RSA private key
+.......................................................................++
+...........................................................++
+writing new private key to 'signing_key.priv'
+-----
+###
+### Key pair generated.
+###
+
