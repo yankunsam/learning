@@ -1,0 +1,42 @@
+
+
+
+int func()
+{
+	if()
+		return 0;
+	if()
+		return 1;
+	if()
+		return 2;
+}
+
+int main()
+{
+	int i;
+
+	i = func();
+
+	.....
+
+	switch(i)
+	{
+		case 0:
+			break;
+		case 1:
+
+		case 2:
+
+		default:
+			_exit(1);		// abort();   // signal();
+
+	}
+
+
+
+}
+
+
+
+
+

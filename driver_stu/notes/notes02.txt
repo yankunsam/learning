@@ -1,0 +1,108 @@
+主题：	1. /proc文件系统的作用(驱动调试)
+	2. 创建自己的proc文件
+	3. 内核的链表(list_head)使用
+	4. 结合内核链表和proc文件实现例子
+
+作业：
+1. 自行完成02proc/proc_test03.c
+2. 看懂02proc/proc_test04.c和proc_test05.c
+
+
+1.proc文件系统
+=======================
+由内核实现的文件系统。当用户态访问/proc下文件时，实际上是调用内核中和该文件对应的特定函数。
+一般用proc文件来实现内核/驱动的调试。
+
+大部分proc文件是只读的，用于获取内核信息;
+还有一些proc文件是可写的，当用户态改变了proc文件的内容时，会调用内核的函数，从而改变内核的对应行为。
+这些可写的文件，一般集中在/proc/sys下
+
+
+
+2.创建自己的proc文件
+==========================
+参考x86-drv/02proc/proc_test01.c
+构建只读的proc文件
+
+x86-drv/02proc/proc_test02.c
+构建可读写的proc文件
+
+create_proc_entry
+proc_create (3.10以后)
+
+
+3.内核的链表
+==========================
+链表是内核中最重要的数据结构，可以自行实现，但建议使用内核提供的标准接口。该接口位于头文件<linux/list.h>，包括一些标准的list_head处理函数和宏.
+用法介绍如下：
+
+//声明一个全局的链表头
+struct list_head my_head;
+
+(1)初始化
+INIT_LIST_HEAD(&my_head);
+每个list_head在加入链表之前，都要先初始化一下
+
+(2)添加
+list_add(new, &my_head);
+list_add_tail(new, &my_head);
+向链表中加入新成员
+
+(3)删除
+list_del(new);
+
+(4)通过list_head的指针找到外部数据结构体的指针
+利用container_of宏
+例子：
+struct b {
+	long test;
+	char ch;
+	struct list_head list;
+	...
+};
+
+void my_test(struct list_head *entry)
+{
+	//通过entry找到外部的结构体b
+	struct b *tmp = container_of(entry, struct b, list);
+	printk("%d:%c\n", tmp->test, tmp->ch);	
+	...
+}
+
+
+(5)链表的遍历
+例子1：
+struct list_head *pos;
+struct b *tmp;
+list_for_each(pos, &my_head) {
+	tmp = container_of(pos, struct b, list);
+	...
+}
+
+例子2：
+list_for_each_entry(...);
+
+struct b *tmp;
+list_for_each_entry(tmp, &my_head, list) {
+	printk("%d\n", tmp->test);
+	...
+}
+
+如果遍历链表的目的是释放链表，推荐使用：
+list_for_each_entry_safe(...);
+
+
+
+4.结合内核链表和proc文件实现例子
+======================================
+参考02proc/proc_test04.c
+基于list_head实现可存储多个字符串的proc文件
+
+proc_test04.c中有一个固有的问题，就是sprintf函数可能会造成缓冲区溢出，传统方法是利用第二个参数start来解决。
+
+但在后期的内核中，采用了新的seq_file接口来辅助实现proc文件的访问。实际上目前绝大多数的proc文件都是用seq_file接口来实现的。
+在LDD3书上介绍了seq_file接口，但该书的内容比较旧，不推荐。
+请参考proc_test04.c和proc_test05.c
+其中，proc_test04.c完成的功能和proc_test02.c一样，而proc_test05.c用于替换proc_test03.c
+
+

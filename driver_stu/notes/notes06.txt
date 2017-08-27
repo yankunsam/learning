@@ -1,0 +1,215 @@
+主题：	1. linux内核的时间
+	2. linux内核中的延迟和定时
+	3. 基于忙循环的延迟
+	4. 基于等待队列的延迟(睡眠)
+	5. linux中的定时器(timer_list)
+	6. 修改led的char驱动，用定时器实现灯的定时闪烁
+
+
+1.内核的时间
+========================
+(1)tick
+--------------------
+内核采用了一个新的时间单位来进行计时。
+该时间单位称为tick(滴答)，一个tick对应硬件定时器两次中断之间的时间间隔。
+当前内核每秒钟硬件定时器会发生HZ次中断。因此，tick和秒的换算关系为：
+	1 tick = 1/HZ秒
+HZ是在内核make menuconfig时确定，如果要修改HZ值，需要重新编译内核。
+看内核的.config文件，可知6410默认采用的HZ为100，4412采用的HZ为200，而x86用1000。HZ的范围一般从100到1000
+如果要延迟1秒钟，相当于延迟HZ个tick。
+0.5秒则为HZ/2个tick
+
+
+(2)相对时间
+------------------
+内核从开机开始记录一个相对时间。内核利用全局变量jiffies来记录从开机到当前时间所经过的tick的总量。
+jiffies++的工作是由硬件定时器的中断处理函数完成的。
+jiffies的类型是unsigned long，在32位平台上最大值为4G。因此，当HZ为1000时，大约49.7天会溢出一次。
+为了避免溢出，可以使用64位的变量jiffies_64
+
+内核里的很多延迟和定时，都是用jiffies进行判断的。
+
+(3)绝对时间
+--------------------
+从1970年1月1日0时0分0秒开始到现在的时间。
+在内核中用两个结构体来记录绝对时间：
+<linux/time.h>中的timeval和timespec。
+例子：
+#include <linux/time.h>
+struct timeval tval;
+struct timespec tspec;
+
+//调用内核的函数来获得绝对时间
+do_gettimeofday(&tval);
+getnstimeofday(&tspec);
+
+//打印绝对时间
+printk("%lds : %ldus\n", tval.tv_sec, tval.tv_usec);
+printk("%lds : %ldns\n", tspec.tv_sec, tspec.tv_nsec);
+
+参考drv-x86/04time/time_test.c
+例子显示了内核的相对和绝对时间
+
+
+
+2.内核的延迟和定时
+=======================
+延迟：当前程序停下来，等待某个条件满足。延迟是不得已的，如果程序可以运行，就不应该延迟
+
+定时：启动定时器，由内核(硬件定时器的中断处理函数)在未来的某个时间为启动定时器的人完成某项工作
+
+
+
+3.基于忙循环的延迟
+=======================
+
+如果是比较短时间的延迟，则可以通过在cpu上运行一段循环来延迟，如果要延迟较长的时间，则需要将当前进程置入睡眠来延迟。
+
+例子：
+#include <linux/delay.h>
+
+ndelay(10); //延迟10ns
+udelay(20); //延迟20us
+mdelay(30); //延迟30ms
+
+内核用for循环实现上述3个函数。其中udelay用的最多，一般用于寄存器间设置的间隔。
+延迟时间和for循环次数的转换是一个经验值。内核在开机时会运行1s(或1个tick)的循环，然后记录循环的次数。udealy等的时间就通过该次数进行转换。
+这个次数记录在/proc/cpuinfo文件的变量bogomips中
+
+参考04time/delay_test1.c
+
+
+
+4.基于等待队列的延迟(基于睡眠)
+==============================
+(1)进程状态和运行队列
+---------------------
+进程的核心结构体为<linux/sched.h>中的task_struct
+区分进程的3个核心状态：
+TASK_RUNNING
+TASK_INTERRUPTIBLE
+TASK_UNINTERRUPTIBLE
+
+处于TASK_RUNNING状态的进程会组织在一个运行队列中，2.6.23内核以后，通过CFS调度器(Completely Fair Scheduler, 完全公平调度器)来调度
+运行队列中的进程用rb_tree组织在一起
+
+
+(2)睡眠给定时间
+-------------------
+基于等待队列，以tick为单位睡眠。
+set_current_state(xxx);
+可以用TASK_INTERRUPT或TASK_UNINTERRUPTIBLE睡眠
+schedule_timeout(xxx);
+参考04time/delay_test02.c
+
+
+(3)等待队列
+----------------------
+等待队列定义在<linux/wait.h>
+每个要等待的条件都可以分配对应的等待队列
+每个队列有一个等待队列头(wait_queue_head_t)
+
+
+例子：
+#include <linux/wait.h>
+
+//声明等待队列头
+wait_queue_head_t mywait;
+
+//队列头使用前要初始化
+init_waitqueue_head(&mywait);
+
+//在char驱动的write函数中，如果缓冲区满则睡眠
+ssize_t my_write(...)
+{
+	if (dev->wp == dev->buf_size) {
+		//wait_event(mywait, dev->wp!=dev->buf_size);
+		ret = wait_event_interruptible(mywait, dev-wp!=dev->buf_size);
+		if (ret != 0)
+			return -ERESTARTSYS;
+	}
+
+	//如果缓冲区非满，则可写
+	...
+}
+
+//在ioctl函数中，可以让缓冲区复位，此时可以唤醒等待队列中的睡眠进程
+int my_ioctl(xxx)
+{
+	//如果复位缓冲区，则唤醒整个队列
+	memset(xxx);
+	dev->wp = 0;
+	//wake_up(&mywait);
+	wake_up_interruptible(&mywait);
+	...
+}
+
+参考drv-x86/04time/下的wait_test.c
+
+
+
+5.定时器(timer_list)
+=======================
+定时器的特征：
+(1)启动定时器的人和执行定时器的人不一样
+一般启动定时器的常常是某个进程或者中断，而内核中负责执行定时器的是硬件定时器的中断处理函数
+
+(2)定时器的执行时间一定是未来
+内核利用jiffies来确定定时器的执行时间
+
+(3)定时器对应的函数只执行一次
+一般谁准备定时器，谁提供执行函数；执行函数的人是内核的硬件定时器中断。如果希望实现一个循环的定时器，则需要在执行函数中自行将定时器再重新启动定时器。
+
+(4)定时器的函数在中断上下文执行
+因此，执行函数中不能睡眠
+
+定时器的核心结构体定义在<linux/timer.h>
+为timer_list。timer_list由启动者准备，当启动定时器后，timer_list会形成一个链表，由内核的硬件定时器中断来检查链表，看有没有定时器到时。
+
+例子：
+#include <linux/timer.h>
+
+//声明定时器
+struct timer_list mytimer;
+
+//定时器的执行函数
+//当定时器到期后，由硬件定时器中断执行一次
+static void 
+my_timer_func(unsigned long data)
+{
+	...//不可睡眠
+}
+
+//初始化定时器
+setup_timer(&mytimer, my_timer_func, data);
+初始化定时器时传入的参数为timer_list的指针；执行函数；传给执行函数的参数
+
+//启动定时器
+mod_timer(&mytimer, jiffies+HZ/10);
+定时器一旦启动，就会加入一个timer_list的链表，一旦到时，就会被执行。
+启动定时器的人和执行的人不是一个。即使启动者退出，定时器仍然执行。
+
+//删除定时器
+del_timer(&mytimer);
+如果模块要rmmod，在卸载之前，必须删除所有没执行的定时器。
+
+参考04time/timer_test.c
+
+
+
+6.修改led的char驱动，用定时器实现灯的定时闪烁
+=============================
+修改drivers/arm-drv/led_test02.c
+(由于每个灯都应该有自己的timer_list，因此采用cdev风格的设备注册例子)
+
+增加ioctl命令，比如：
+#define LED_TYPE	'L'
+#define LED_START	_IOW(LED_TYPE, 1, int)
+#define LED_STOP	_IO(LED_TYPE, 2)
+#define LED_INTERVAL	_IOW(LED_TYPE, 3, int)
+
+通过start命令启动灯进行闪烁，用stop命令关闭闪烁；
+通过interval命令确定灯亮灭的间隔
+
+实现的例子为led_test05.c
+

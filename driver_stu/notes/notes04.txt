@@ -1,0 +1,142 @@
+主题：	1. 4412开发板的linux内核的说明
+	2. linux3.5_tiny4412的配置和编译
+	3. 通过superboot烧写内核和android文件系统
+	4. 将写好的驱动编译到zImage中(要写Kconfig和Makefile)
+	5. 在android中测试驱动
+
+作业：
+1.参考4412的手册，在make menuconfig时，找出4412外设的配置选项。进一步找到对应外设的驱动位置
+
+
+
+1.4412开发板的linux内核说明
+=============================
+该内核由google提供，由三星提供移植。内核中已经包含了三星exynos4412处理器的大部分驱动。
+
+为了方便利用ctags进行代码查询，该内核arch目录下的代码已经经过了裁剪，只保留arm目录；
+arm目录下的内容也进行了裁剪，只保留和exynos4412处理器相关的代码:
+mach-exynos/和plat-samsung/
+
+mach-exynos目录下的核心代码是mach-tiny4412.c，该文件是我们开发板的初始化文件，板子在启动过程中用到的核心硬件配置信息都来自于该文件
+
+
+
+2. 4412内核的配置和编译
+=========================
+(1)准备好交叉编译器
+可以使用arm课程阶段准备好的arm-linux-gcc，如果没有，则解压缩tools目录下的crosstools-451.tar.gz
+修改/etc/bashrc文件，加入：
+export PATH=/home/exynos-cur/toolchain/4.5.1/bin:$PATH
+
+要使用编译器，还需要更新环境变量:
+$>source /etc/bashrc
+或者重新启动机器
+
+(2)内核的配置和编译
+在内核的根目录下，已经有两个准备好的配置文件:
+tiny4412_android_defconfig
+和android文件系统配套使用;
+tiny4412_linux_defconfig
+和qt制作的文件系统配套使用;
+tiny4412_ubuntu_defconfig
+和ubuntu系统配套使用；
+
+我们要使用tiny4412_android_defconfig
+$>cp tiny4412_android_defconfig .config
+$>make menuconfig
+$>make
+
+在make menuconfig时，可以看看和4412相关的选项
+
+
+
+3.通过superboot烧写内核和android文件系统
+===========================
+参考文档docs/在linux下烧写superboot.pdf
+(该文档说明如何在linux下准备好合适的SD卡，并烧入superboot)
+SD卡的分区使用fdisk工具;
+格式化使用mkfs.vfat工具;
+将superboot.bin写入SD卡的工具为write4412boot，在tools目录下;
+superboot.bin在images目录下；
+
+具体将烧写哪个内核和文件系统，要修改images目录下的文件FriendlyARM.ini。
+在烧写android时，要修改文件中如下一行：
+Android-CommandLine = console=ttySAC0,115200n8 androidboot.console=ttySAC0 ethmac=00:90:a3:02:03:04 ctp=2 skipcali=y uhost0=n vmalloc=512m
+其中，ethmac指定板子网卡的MAC地址，uhost0=n则负责启用板子的microUSB。如果设定uhost0=y，则无法通过ADB连接板子
+
+
+
+4.将写好的驱动编译到zImage
+============================
+我们之前写的驱动编译为ko模块，必须通过insmod加载到当前运行的内核;
+对于常见设备的启动，更推荐将其放入内核的源代码树中，编译到zImage中直接运行。
+
+(1)为自己的驱动选择目录
+要想把驱动编译到zImage中，必须将代码放置到内核的源代码树中。
+驱动应统一放到内核的drivers子目录中，一般来说，应该放到对应功能的子目录中。比如为mmc控制器写的驱动，就应该放到drivers/mmc目录下。
+
+为了教学方便，我们要创建一个新的子目录，把在4412上运行的所有驱动都放到该目录下：
+$>cd linux35_tiny4412/
+$>mkdir drivers/arm-drv/
+
+(2)将写好的驱动拷贝到该目录下
+$>cp x86-drv/03char/char_test*.c drivers/arm-drv/
+
+(3)写自己的Kconfig
+关于Kconfig文件的写法，可以参考内核源代码目录Documentation/kbuild下的文档;
+或者是参考其他驱动的写法，比如watchdog/Kconfig
+参考arm-drv/Kconfig
+
+(4)修改上层的Kconfig
+下一步要修改上层的Kconfig，从而找到我们新写的Kconfig。
+$>vim drivers/Kconfig
+在第2行加入：
+source "drivers/arm-drv/Kconfig"
+
+(5)通过menuconfig选择新的驱动
+$>make menuconfig
+选择新的驱动，选完后查看一下.config文件
+对应的配置选项为CONFIG_CHAR01等
+
+(6)准备自己的Makefile
+.config生成以后，就可以进入内核的编译了，首先要准备自己的Makefile
+$>vim drivers/arm-drv/Makefile
+
+(7)修改上层的Makefile
+修改drivers/Makefile:
+在文件的79行左右加入下面一行：
+obj-$(CONFIG_DRV_TINY4412) += arm-drv/
+//尽量保证加在input目录之前
+
+(8)编译内核
+$>make
+根据make menuconfig的配置，将新的驱动或者直接编译到zImage中，或者编译为.ko
+
+(9)测试
+如果修改了zImage，则需要用superboot重新烧写到eMMC。如果编译为.ko，则可以用adb拷贝到板子上：
+$>adb remount
+$>adb push drivers/arm-drv/char_test02.ko /system/bin
+$>adb shell
+在板子上可以insmod/rmmod/mknod等
+
+
+
+5.在android中测试驱动
+=========================
+(1)链接板子上的libc库
+参考docs/android-sum.h中关于elf应用程序编译的部分
+需要写Android.mk
+
+(2)静态编译应用程序
+也可以将应用程序加-static参数编译：
+$>cd work/drv-x86/03char/
+$>arm-linux-gcc -static -o buf01 buf01.c
+接下来，首先启动开发板，然后将usb线连上，在pc端执行：
+$>adb remount 
+//确保可以将数据写入android的/system目录
+$>adb push buf01 /system/bin
+//将编译好的应用程序，拷贝到android下的/system/bin目录
+$>adb shell
+//登陆android，可以直接执行buf01
+
+

@@ -1,0 +1,1 @@
+cmd_/home/sam/self/learning/modules/init.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/sam/self/learning/modules/init.ko /home/sam/self/learning/modules/init.o /home/sam/self/learning/modules/init.mod.o

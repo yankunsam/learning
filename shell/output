@@ -1,0 +1,11 @@
+#!/data/ltp/bash
+cat  <<-EOF >&1
+hello
+hello
+sam
+sam
+EOF
+echo `mktemp`
+LOG_FILE=`mktemp`
+echo $LOG_FILE
+

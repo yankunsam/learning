@@ -1,0 +1,189 @@
+主题：	1. linux和加锁(同步)相关的内容
+	2. 内核的哪些机制导致必须加锁
+	3. atomic_t(原子变量)及例子
+	4. spinlock_t(自旋锁)及例子
+	5. mutex(互斥锁)
+	6. semaphore(信号量)
+	7. 基于mutex实现内存管道的例子
+
+
+1.内核的加锁相关内容
+=======================
+(1)为什么要保护
+如果模块中的某个全局变量可以被多个进程/中断同时访问，那么就必须要提供加锁机制进行保护。同时写是不允许的。
+
+(2)和加锁保护相关的名词
+*临界区(critical region)
+访问要保护的变量的代码段，称为临界区。临界区中同一时间只能一个人进入。
+临界区的代码可能分散在不同的函数中。如果要对临界区加锁，则必须保证在临界区的所有部分都加锁。如果有遗漏，则加锁是不可靠的。
+
+*同步(synchronization)
+其实就是加锁。同步是保证临界区只进一个人的机制。
+
+*竞争(race condition)
+如果有多个人同时进入临界区，就称为竞争。一般来说，认为出现竞争是错误的。
+	
+(3)加锁的原则
+*加锁是自愿的
+内核不强迫程序加锁，但一旦使用了锁，驱动设计人员应该保证正确地使用锁，并保证在临界区的每个部分都加上锁
+
+*不要用锁来实现功能
+锁就是用来避免对变量同时访问，是一种保护机制。
+如果将加锁相关代码去掉，程序功能应该没有任何变化。
+
+*应该在一开始设计代码时，就考虑如何加锁
+一定不要代码设计完毕后再加锁，很容易出问题。最好在设计私有结构体时，就开始考虑锁的使用。锁一般会包括到私有结构体中，根据设备的复杂程度，有可能需要多把锁。
+
+
+(4)死锁
+如果加锁不恰当，可能出现死锁。
+有两种常见的死锁情况：
+*自死锁
+*ABBA死锁
+
+
+
+2.linux内核中的哪些机制导致必须要加锁
+=======================================
+换句话说，如果没有这些机制，就可以不加锁了。
+也就是说，如果当前内核不可能出现“同时”，则不必加锁。
+
+可能导致同时访问变量的内核机制有：
+(1)SMP
+(2)中断
+(3)内核抢占(preempt)
+(4)schedule()
+
+需要了解这些机制，才能够正确使用加锁函数。
+
+
+
+3.atomic_t(原子变量)
+==========================
+对于i++类型的临界区，如果用普通的加锁保护，效率太低，因此内核推荐用atomic_t类型的变量来替代传统的int型变量。
+对atomic_t类型的变量，内核提供更简单、安全的访问。只要访问atomic_t变量，就必须使用内核提供的函数。注意！不同的处理器实现原子操作的方式不同。
+
+例子：
+#include <linux/atomic.h> //或<asm/atomic.h>
+由于atomic_t的实现和具体处理器相关，因此参考头文件arch/arm/include/asm/atomic.h
+
+//声明并初始化atomic_t变量
+atomic_t mycnt = ATOMIC_INIT(5); 
+或：
+atomic_set(&mycnt, 5);
+
+//获得atomic_t中的计数
+int i = atomic_read(&mycnt);
+
+//变量的++
+atomic_inc(&mycnt);
+
+有几个最常见的atomic函数，对应int型的操作：
+atomic_add / +=
+atomic_sub / -=
+atomic_inc / ++
+atomic_dec / --
+
+参考arm-drv/03key/atomic_test01.c
+
+
+4.spinlock_t(自旋锁)
+=========================
+内核中用的最多的锁，轻量级的锁，一般加解锁和等待锁的时间在ns级。
+
+spinlock_t的特性：
+(1)临界区中只能进入一个人
+(2)等待的人忙等(只有SMP才会真正忙等)
+(3)持有锁的人不能睡眠
+
+结合前面讨论的内核机制，可以知道，spinlock可以针对SMP，中断和内核抢占提供保护。但schdule()不行。
+也就是说，如果临界区中必须调用kmalloc(size, GFP_KERNEL)，或者copy_to|from_user之类可能导致睡眠的函数，则不能用spinlock保护。
+
+spinlock的使用例子：
+#include <linux/spinlock.h>
+
+//声明锁
+spinlock_t mylock;
+
+//使用之前要先初始化
+spin_lock_init(&mylock);
+
+(1)普通的加解锁
+spin_lock(&mylock);
+...//临界区
+spin_unlock(&mylock);
+
+(2)如果临界区可能被中断处理函数打断，并影响到要保护的变量，则应该在加锁的同时关闭中断
+//加锁同时关中断，将CPSR的当前值存储到flags中
+//解锁时打开中断，并将flags的值恢复到CPSR中
+unsigned long flags;
+spin_lock_irqsave(&mylock, flags);
+...//临界区
+spin_unlock_irqrestore(&mylock, flags);
+
+spinlock_t的一个典型应用是保护链表;
+由于内核要求同一时间只能一个人访问list_head链表，因此一般要用spinlock_t保护
+
+参考arm-drv/03key/spin_test01.c
+
+
+
+5. mutex互斥锁
+====================
+mutex锁也是内核中非常重要的锁，属于重量级的锁，等待锁的时间常常为ms级
+
+mutex的特性：
+(1)临界区中一个人
+(2)睡眠等
+(3)持有锁时可以睡眠(必须确保能被唤醒)
+
+如果临界区中包含中断处理函数的代码，由于获得mutex时可能导致睡眠，因此不能用mutex来保护。其他情况都可以。
+
+使用例子：
+#include <linux/mutex.h>
+
+//声明mutex锁
+struct mutex mylock;
+
+//用之前要先初始化
+mutex_init(&mylock);
+
+//加锁和解锁
+//mutex_lock(&mylock);
+ret = mutex_lock_interruptible(&mylock);
+if (ret)
+	return -ERESTARTSYS;
+...//临界区
+
+mutex_unlock(&mylock);
+
+
+
+6.semaphore(信号量)
+=======================
+定义在<linux/semaphore.h>中。2.6内核早期没有实现mutex锁，用semaphore来实现mutex锁的功能。
+
+在现在的内核中，基本上已经不用semaphore来保护临界区。如果内核中某些资源限定了访问人数(比如只允许3个人同时访问)，这时候可以用semaphore进行保护。
+
+sempahore的使用例子如下：
+
+#include <linux/semaphore.h>
+
+//声明信号量
+struct semaphore mysem;
+
+//按照资源的限定初始化信号量
+sema_init(&mysem, 3);
+
+down(&mysem);
+ret = down_interruptible(&mysem);
+...//访问受限资源的代码
+up(&mysem);
+
+
+7.内存管道的例子
+======================
+修改以前写过的缓冲区的char驱动，将缓冲区的访问模式改变为PIPE型的，增加rp指针。
+
+写06mutex/mutex_test01.c
+参考06mutex/mutex_test02.c
