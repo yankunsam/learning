@@ -2,8 +2,8 @@ FROM ubuntu:16.04
 RUN apt-get update
 RUN apt-get install -y libssl1.0.0 libssl-dev vim
 RUN mkdir -p /opt/data
-COPY data /root/data
 COPY nodeos /usr/local/bin/nodeos
+COPY data /root/data
 COPY cleos /usr/local/bin/cleos
 COPY keosd /usr/local/bin/keosd
 #COPY scholar-server-config /root/config
@@ -17,3 +17,4 @@ COPY 4-install-core-contract.sh /root/data/4-install-core-contract.sh
 COPY 5-create-issue-tokens.sh /root/data/5-create-issue-tokens.sh
 EXPOSE 8888
 EXPOSE 8889
+EXPOSE 9876
