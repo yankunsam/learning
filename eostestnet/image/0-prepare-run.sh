@@ -8,7 +8,9 @@ privatekey=$(echo $command | awk '{print $3}')
 echo "privatekey:" $privatekey
 publickkey=$(echo $command | awk '{print $6}')
 echo "publickkey:" $publickkey
-sed -i 's/\"initial_key\"\:.*/"initial_key": "'$publickkey'",/g' $genesisfile
+if [ $(hostname) == "eosio"  ]; then
+  sed -i 's/\"initial_key\"\:.*/"initial_key": "'$publickkey'",/g' $genesisfile
+fi
 sed  -i 's/private-key.*/private-key=["'$publickkey'","'$privatekey'"]/g' $configfile
 sed -i 's/.*producer-name.*/producer-name = '$(hostname)'/g' /root/data/config.ini
 
